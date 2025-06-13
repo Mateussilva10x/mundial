@@ -122,7 +122,8 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, setDoc, collection, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        // Importe serverTimestamp junto com as outras funções do Firestore
+        import { getFirestore, doc, onSnapshot, setDoc, collection, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         
         const firebaseConfig = {
           apiKey: "AIzaSyDQdsXY1EsN0HfIJNOgMeuij7_ZoWZDQ4w",
@@ -233,6 +234,8 @@
                     });
                     officialData.champions.champion = document.getElementById('official-champion').value;
                     officialData.champions.vice = document.getElementById('official-vice').value;
+                    // Adiciona o timestamp na atualização dos resultados oficiais
+                    officialData.lastUpdatedAt = serverTimestamp();
                     setDoc(doc(db, "bolao", "official"), officialData, { merge: true });
                 });
             });
@@ -257,28 +260,35 @@
 
             let matchesHTML = '';
              for (const groupName in groupedMatches) {
-                matchesHTML += `<div class="mb-4"><h4 class="font-bold text-lg text-gray-300 border-b border-gray-700 pb-1 mb-2">${groupName.startsWith('G') ? 'Grupo '+groupName : groupName}</h4><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">`;
-                groupedMatches[groupName].forEach(match => {
-                    matchesHTML += `
-                        <div class="flex items-center justify-between text-sm p-2 bg-gray-800 rounded-md">
-                            <span class="text-right flex-1 truncate pr-2">${match.home}</span>
-                            <div class="flex items-center gap-1">
-                                <input type="number" data-doc="${docId}" data-match-id="${match.id}" data-team="home" class="input-score w-10 text-center rounded participant-input" ${docId !== currentUser?.uid ? 'disabled' : ''}>
-                                <span>x</span>
-                                <input type="number" data-doc="${docId}" data-match-id="${match.id}" data-team="away" class="input-score w-10 text-center rounded participant-input" ${docId !== currentUser?.uid ? 'disabled' : ''}>
+                // Apenas exibe a seção se for um grupo (A-H) ou se for mata-mata
+                if (groupName.length === 1 || ['Oitavas', 'Quartas', 'Semi', 'Final'].includes(groupName)) {
+                    matchesHTML += `<div class="mb-4"><h4 class="font-bold text-lg text-gray-300 border-b border-gray-700 pb-1 mb-2">${groupName.length === 1 ? 'Grupo ' + groupName : groupName}</h4><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">`;
+                    groupedMatches[groupName].forEach(match => {
+                        matchesHTML += `
+                            <div class="flex items-center justify-between text-sm p-2 bg-gray-800 rounded-md">
+                                <span class="text-right flex-1 truncate pr-2">${match.home}</span>
+                                <div class="flex items-center gap-1">
+                                    <input type="number" data-doc="${docId}" data-match-id="${match.id}" data-team="home" class="input-score w-10 text-center rounded participant-input" ${docId !== currentUser?.uid ? 'disabled' : ''}>
+                                    <span>x</span>
+                                    <input type="number" data-doc="${docId}" data-match-id="${match.id}" data-team="away" class="input-score w-10 text-center rounded participant-input" ${docId !== currentUser?.uid ? 'disabled' : ''}>
+                                </div>
+                                <span class="text-left flex-1 truncate pl-2">${match.away}</span>
                             </div>
-                            <span class="text-left flex-1 truncate pl-2">${match.away}</span>
-                        </div>
-                    `;
-                });
-                matchesHTML += `</div></div>`;
+                        `;
+                    });
+                    matchesHTML += `</div></div>`;
+                }
             }
+            
+            // Formata a data da última atualização para exibição
+            const lastUpdate = data.lastUpdatedAt ? new Date(data.lastUpdatedAt.seconds * 1000).toLocaleString('pt-BR') : 'Ainda não salvo';
 
             participantCard.innerHTML = `
-                <div class="flex flex-col sm:flex-row gap-4 p-3 bg-gray-800 rounded-t-lg">
+                <div class="flex flex-col sm:flex-row gap-4 p-3 bg-gray-800 rounded-t-lg items-center">
                     <input type="text" value="${data.name || ''}" class="participant-name input-text flex-grow rounded p-2" data-doc="${docId}" data-field="name" placeholder="Nome do Participante" ${docId !== currentUser?.uid ? 'disabled' : ''}>
                     <input type="text" value="${data.champions?.champion || ''}" class="input-text flex-grow rounded p-2" data-doc="${docId}" data-field="champion" placeholder="Palpite para Campeão" ${docId !== currentUser?.uid ? 'disabled' : ''}>
                     <input type="text" value="${data.champions?.vice || ''}" class="input-text flex-grow rounded p-2" data-doc="${docId}" data-field="vice" placeholder="Palpite para Vice" ${docId !== currentUser?.uid ? 'disabled' : ''}>
+                    <div class="text-xs text-gray-400 text-right flex-shrink-0">Última atualização: ${lastUpdate}</div>
                 </div>
                 <div class="p-3 bg-gray-900 rounded-b-lg">
                     <div class="mb-6">
@@ -308,7 +318,9 @@
                         setDoc(doc(db, "bolao", currentUser.uid), {
                             name: `Participante ${currentUser.uid.substring(0, 5)}`,
                             bets: {},
-                            champions: { champion: '', vice: '' }
+                            champions: { champion: '', vice: '' },
+                            createdAt: serverTimestamp(), // Adiciona timestamp na criação
+                            lastUpdatedAt: serverTimestamp() // Adiciona timestamp na criação
                         });
                     }
                 });
@@ -356,8 +368,9 @@
                         else if (matchId) updateData[`bets.${matchId}.${team}`] = target.value === '' ? null : parseInt(target.value);
 
                         if(Object.keys(updateData).length > 0) {
+                            // Adiciona o timestamp em qualquer atualização
+                            updateData.lastUpdatedAt = serverTimestamp();
                             updateDoc(doc(db, "bolao", docId), updateData).then(() => {
-                                // Atualiza a simulação de tabela do participante
                                 const currentBets = {};
                                 document.querySelectorAll(`#participant-${docId} input[data-match-id]`).forEach(input => {
                                     const mId = input.dataset.matchId;
