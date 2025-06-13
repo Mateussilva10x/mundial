@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bolão Colaborativo - Mundial 2025</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg-dark: #111827; --bg-card: #1F2937; --border-color: #374151; --text-main: #F9FAFB; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-dark); color: var(--text-main); }
+        .card { background-color: var(--bg-card); border: 1px solid var(--border-color); }
+        .input-score, .input-text { background-color: var(--bg-dark); border: 1px solid var(--border-color); color: var(--text-main); }
+        .tab-button { background-color: var(--border-color); }
+        .tab-button.active { background-color: #3B82F6; color: white; }
+    </style>
+</head>
+<body class="p-2 sm:p-4">
+    
+    <!-- AVISO DE CONFIGURAÇÃO DO FIREBASE -->
+    <div id="config-warning" class="hidden fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
+        <div class="bg-red-800 border-2 border-red-600 text-white p-8 rounded-lg text-center max-w-lg shadow-2xl">
+            <h2 class="text-3xl font-bold mb-4">Erro de Configuração do Firebase!</h2>
+            <p class="mb-4">As chaves do Firebase não foram configuradas corretamente. Para que o bolão funcione, você precisa criar um projeto no Firebase e colar suas chaves de configuração neste arquivo HTML.</p>
+            <p class="text-sm text-red-200">Procure pela variável <code class="bg-red-900 px-2 py-1 rounded">firebaseConfig</code> no código-fonte e substitua os valores de exemplo pelos seus valores reais.</p>
+        </div>
+    </div>
+
+    <div class="max-w-screen-xl mx-auto space-y-6">
+
+        <header class="text-center py-4">
+            <h1 class="text-3xl sm:text-5xl font-bold">Bolão Colaborativo 2025</h1>
+            <p class="text-lg text-gray-400 mt-2">Resultados e palpites em tempo real com Firebase</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-1 card p-4 sm:p-6 rounded-lg">
+                <h2 class="text-xl font-bold mb-3">Regras e Pontuação</h2>
+                <ul class="list-disc list-inside space-y-1 text-sm text-gray-300">
+                    <li><span class="font-bold text-green-400">10 pts:</span> Acertar o placar exato.</li>
+                    <li><span class="font-bold text-yellow-400">4 pts:</span> Vencedor + gols de 1 time.</li>
+                    <li><span class="font-bold text-blue-400">3 pts:</span> Apenas o vencedor ou empate.</li>
+                    <li><span class="font-bold text-purple-400">25 pts:</span> Acertar o Campeão.</li>
+                    <li><span class="font-bold text-purple-400">15 pts:</span> Acertar o Vice-Campeão.</li>
+                </ul>
+                <p class="text-xs text-gray-500 mt-4">Seu ID de usuário: <span id="user-id" class="font-mono"></span></p>
+            </div>
+            <div class="lg:col-span-2 card p-4 sm:p-6 rounded-lg">
+                <h2 class="text-xl font-bold mb-3">Ranking Geral</h2>
+                <div id="ranking-container" class="space-y-2"></div>
+            </div>
+        </div>
+        
+        <div class="card p-4 sm:p-6 rounded-lg">
+            <h2 class="text-xl font-bold mb-4">Resultados Oficiais (Admin)</h2>
+            <div id="official-results-container" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 text-sm"></div>
+            <div class="mt-4 pt-4 border-t border-gray-700 flex flex-col sm:flex-row gap-4">
+                <input type="text" id="official-champion" class="input-text w-full rounded p-2" placeholder="Time Campeão">
+                <input type="text" id="official-vice" class="input-text w-full rounded p-2" placeholder="Time Vice-Campeão">
+            </div>
+        </div>
+
+        <div class="card p-4 sm:p-6 rounded-lg">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+                <h2 class="text-xl font-bold">Meus Palpites</h2>
+                <button id="add-participant" class="mt-2 sm:mt-0 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Criar meu cartão de palpites</button>
+            </div>
+            <div id="participants-container"></div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc, collection, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        
+        // ==========================================================================================
+        //  ATENÇÃO: SUA CONFIGURAÇÃO DO FIREBASE VAI AQUI
+        // ==========================================================================================
+        // Para conseguir, vá em: console.firebase.google.com -> Criar Projeto -> Configurações do Projeto -> Web App
+        // Copie o objeto de configuração que o Firebase te dá e cole aqui, substituindo o exemplo abaixo.
+        const firebaseConfig = {
+          apiKey: "AIzaSyDQdsXY1EsN0HfIJNOgMeuij7_ZoWZDQ4w",
+          authDomain: "mundial-bolao.firebaseapp.com",
+          projectId: "mundial-bolao",
+          storageBucket: "mundial-bolao.firebasestorage.app",
+          messagingSenderId: "735327254290",
+          appId: "1:735327254290:web:b97205dbdf99b6c51da5cb"
+        };
+        
+        // Checagem de segurança para garantir que a configuração foi preenchida.
+        if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+            document.getElementById('config-warning').classList.remove('hidden');
+            // Impede a execução do resto do script se a chave não for válida.
+            throw new Error("Firebase config is not set. Please update the firebaseConfig object in your HTML file.");
+        }
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        let currentUser = null;
+
+        const matches = [
+            // GRUPO A
+            { id: 'm1', group: 'A', home: 'Palmeiras', away: 'Porto' }, { id: 'm2', group: 'A', home: 'Inter Miami', away: 'Al Ahly' },
+            { id: 'm3', group: 'A', home: 'Palmeiras', away: 'Inter Miami' }, { id: 'm4', group: 'A', home: 'Al Ahly', away: 'Porto' },
+            { id: 'm5', group: 'A', home: 'Porto', away: 'Inter Miami' }, { id: 'm6', group: 'A', home: 'Al Ahly', away: 'Palmeiras' },
+            // GRUPO B
+            { id: 'm7', group: 'B', home: 'PSG', away: 'Atlético de Madrid' }, { id: 'm8', group: 'B', home: 'Botafogo', away: 'Seattle Sounders' },
+            { id: 'm9', group: 'B', home: 'PSG', away: 'Botafogo' }, { id: 'm10', group: 'B', home: 'Seattle Sounders', away: 'Atlético de Madrid' },
+            { id: 'm11', group: 'B', home: 'Atlético de Madrid', away: 'Botafogo' }, { id: 'm12', group: 'B', home: 'Seattle Sounders', away: 'PSG' },
+            // GRUPO C
+            { id: 'm13', group: 'C', home: 'Bayern de Munique', away: 'Auckland City' }, { id: 'm14', group: 'C', home: 'Boca Juniors', away: 'Benfica' },
+            { id: 'm15', group: 'C', home: 'Bayern de Munique', away: 'Boca Juniors' }, { id: 'm16', group: 'C', home: 'Benfica', away: 'Auckland City' },
+            { id: 'm17', group: 'C', home: 'Auckland City', away: 'Boca Juniors' }, { id: 'm18', group: 'C', home: 'Benfica', away: 'Bayern de Munique' },
+            // GRUPO D
+            { id: 'm19', group: 'D', home: 'Flamengo', away: 'Espérance' }, { id: 'm20', group: 'D', home: 'Chelsea', away: 'Los Angeles FC' },
+            { id: 'm21', group: 'D', home: 'Flamengo', away: 'Chelsea' }, { id: 'm22', group: 'D', home: 'Los Angeles FC', away: 'Espérance' },
+            { id: 'm23', group: 'D', home: 'Espérance', away: 'Chelsea' }, { id: 'm24', group: 'D', home: 'Los Angeles FC', away: 'Flamengo' },
+            // GRUPO E
+            { id: 'm25', group: 'E', home: 'River Plate', away: 'Urawa Red' }, { id: 'm26', group: 'E', home: 'Inter de Milão', away: 'Monterrey' },
+            { id: 'm27', group: 'E', home: 'River Plate', away: 'Inter de Milão' }, { id: 'm28', group: 'E', home: 'Monterrey', away: 'Urawa Red' },
+            { id: 'm29', group: 'E', home: 'Urawa Red', away: 'Inter de Milão' }, { id: 'm30', group: 'E', home: 'Monterrey', away: 'River Plate' },
+            // GRUPO F
+            { id: 'm31', group: 'F', home: 'Fluminense', away: 'B. Dortmund' }, { id: 'm32', group: 'F', home: 'Ulsan HD', away: 'Mamelodi' },
+            { id: 'm33', group: 'F', home: 'Fluminense', away: 'Ulsan HD' }, { id: 'm34', group: 'F', home: 'Mamelodi', away: 'B. Dortmund' },
+            { id: 'm35', group: 'F', home: 'B. Dortmund', away: 'Ulsan HD' }, { id: 'm36', group: 'F', home: 'Mamelodi', away: 'Fluminense' },
+            // GRUPO G
+            { id: 'm37', group: 'G', home: 'Man. City', away: 'Wydad' }, { id: 'm38', group: 'G', home: 'Juventus', away: 'Al Ain' },
+            { id: 'm39', group: 'G', home: 'Man. City', away: 'Juventus' }, { id: 'm40', group: 'G', home: 'Al Ain', away: 'Wydad' },
+            { id: 'm41', group: 'G', home: 'Wydad', away: 'Juventus' }, { id: 'm42', group: 'G', home: 'Al Ain', away: 'Man. City' },
+            // GRUPO H
+            { id: 'm43', group: 'H', home: 'Real Madrid', away: 'Al Hilal' }, { id: 'm44', group: 'H', home: 'Pachuca', away: 'RB Salzburg' },
+            { id: 'm45', group: 'H', home: 'Real Madrid', away: 'Pachuca' }, { id: 'm46', group: 'H', home: 'RB Salzburg', away: 'Al Hilal' },
+            { id: 'm47', group: 'H', home: 'Al Hilal', away: 'Pachuca' }, { id: 'm48', group: 'H', home: 'RB Salzburg', away: 'Real Madrid' },
+            // MATA-MATA
+            { id: 'm49', group: 'Oitavas', home: '1º Grupo A', away: '2º Grupo B' }, { id: 'm50', group: 'Oitavas', home: '1º Grupo C', away: '2º Grupo D' },
+            { id: 'm51', group: 'Oitavas', home: '1º Grupo E', away: '2º Grupo F' }, { id: 'm52', group: 'Oitavas', home: '1º Grupo G', away: '2º Grupo H' },
+            { id: 'm53', group: 'Oitavas', home: '1º Grupo B', away: '2º Grupo A' }, { id: 'm54', group: 'Oitavas', home: '1º Grupo D', away: '2º Grupo C' },
+            { id: 'm55', group: 'Oitavas', home: '1º Grupo F', away: '2º Grupo E' }, { id: 'm56', group: 'Oitavas', home: '1º Grupo H', away: '2º Grupo G' },
+            { id: 'm57', group: 'Quartas', home: 'Venc. Oitavas 1', away: 'Venc. Oitavas 2' }, { id: 'm58', group: 'Quartas', home: 'Venc. Oitavas 3', away: 'Venc. Oitavas 4' },
+            { id: 'm59', group: 'Quartas', home: 'Venc. Oitavas 5', away: 'Venc. Oitavas 6' }, { id: 'm60', group: 'Quartas', home: 'Venc. Oitavas 7', away: 'Venc. Oitavas 8' },
+            { id: 'm61', group: 'Semi', home: 'Venc. Quartas 1', away: 'Venc. Quartas 2' }, { id: 'm62', group: 'Semi', home: 'Venc. Quartas 3', away: 'Venc. Quartas 4' },
+            { id: 'm63', group: 'Final', home: 'Venc. Semi 1', away: 'Venc. Semi 2' },
+        ];
+        
+        // --- CÓDIGO DE LÓGICA E UI ---
+        function renderOfficialResults() {
+            const container = document.getElementById('official-results-container');
+            container.innerHTML = matches.map(m => `
+                <div class="flex items-center justify-between text-sm p-2 bg-gray-800 rounded-md">
+                    <span class="font-semibold truncate pr-2 text-xs">${m.home} vs ${m.away}</span>
+                    <div class="flex items-center gap-1">
+                        <input type="number" id="official-${m.id}-home" class="input-score w-10 text-center rounded">
+                        <span>x</span>
+                        <input type="number" id="official-${m.id}-away" class="input-score w-10 text-center rounded">
+                    </div>
+                </div>
+            `).join('');
+
+            document.querySelectorAll('#official-results-container input, #official-champion, #official-vice').forEach(el => {
+                el.addEventListener('change', () => {
+                    if (!currentUser) return; 
+                    const officialData = { bets: {}, champions: {} };
+                    matches.forEach(m => {
+                        const home = document.getElementById(`official-${m.id}-home`).value;
+                        const away = document.getElementById(`official-${m.id}-away`).value;
+                        if (home !== "" && away !== "") officialData.bets[m.id] = { home: parseInt(home), away: parseInt(away) };
+                    });
+                    officialData.champions.champion = document.getElementById('official-champion').value;
+                    officialData.champions.vice = document.getElementById('official-vice').value;
+                    setDoc(doc(db, "bolao", "official"), officialData);
+                });
+            });
+        }
+        
+        function renderParticipant(docId, data) {
+            let container = document.getElementById('participants-container');
+            let participantCard = document.getElementById(`participant-${docId}`);
+            if (!participantCard) {
+                participantCard = document.createElement('div');
+                participantCard.id = `participant-${docId}`;
+                participantCard.className = 'participant-card mb-6 card p-4 rounded-lg';
+                container.appendChild(participantCard);
+            }
+            
+            const groupedMatches = matches.reduce((acc, m) => {
+                if(!acc[m.group]) acc[m.group] = [];
+                acc[m.group].push(m);
+                return acc;
+            }, {});
+
+            let tabsHTML = Object.keys(groupedMatches).map(group => `<button class="tab-button p-2 rounded-md text-sm" data-group="${group}">${group.replace(" ","_")}</button>`).join('');
+            
+            let contentHTML = Object.entries(groupedMatches).map(([group, groupMatches]) => `
+                <div id="group-content-${docId}-${group.replace(" ","_")}" class="group-content hidden grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div>
+                        <h4 class="font-bold mb-2">Palpites - ${group}</h4>
+                        <div class="space-y-2">
+                        ${groupMatches.map(m => `
+                            <div class="flex items-center justify-between text-sm p-2 bg-gray-800 rounded-md">
+                                <span class="text-right flex-1 truncate pr-2">${m.home}</span>
+                                <div class="flex items-center gap-1">
+                                    <input type="number" data-doc="${docId}" data-match-id="${m.id}" data-team="home" class="input-score w-10 text-center rounded participant-input" ${docId !== currentUser?.uid ? 'disabled' : ''}>
+                                    <span>x</span>
+                                    <input type="number" data-doc="${docId}" data-match-id="${m.id}" data-team="away" class="input-score w-10 text-center rounded participant-input" ${docId !== currentUser?.uid ? 'disabled' : ''}>
+                                </div>
+                                <span class="text-left flex-1 truncate pl-2">${m.away}</span>
+                            </div>`).join('')}
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="font-bold mb-2">Classificação (Simulação)</h4>
+                        <table class="w-full text-xs text-left">
+                            <thead class="bg-gray-700"><tr><th class="p-1">Time</th><th>P</th><th>V</th><th>E</th><th>D</th><th>SG</th></tr></thead>
+                            <tbody id="standings-${docId}-${group.replace(" ","_")}"></tbody>
+                        </table>
+                    </div>
+                </div>`).join('');
+
+            participantCard.innerHTML = `
+                <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                    <input type="text" value="${data.name || ''}" class="input-text flex-grow rounded p-2 participant-input" data-doc="${docId}" data-field="name" placeholder="Seu Nome" ${docId !== currentUser?.uid ? 'disabled' : ''}>
+                    <input type="text" value="${data.champions?.champion || ''}" class="input-text flex-grow rounded p-2 participant-input" data-doc="${docId}" data-field="champion" placeholder="Campeão" ${docId !== currentUser?.uid ? 'disabled' : ''}>
+                    <input type="text" value="${data.champions?.vice || ''}" class="input-text flex-grow rounded p-2 participant-input" data-doc="${docId}" data-field="vice" placeholder="Vice" ${docId !== currentUser?.uid ? 'disabled' : ''}>
+                </div>
+                <div class="flex gap-2 mt-4 overflow-x-auto p-1">${tabsHTML}</div>
+                ${contentHTML}
+            `;
+
+            Object.entries(data.bets || {}).forEach(([matchId, bet]) => {
+                const homeInput = participantCard.querySelector(`[data-match-id="${matchId}"][data-team="home"]`);
+                const awayInput = participantCard.querySelector(`[data-match-id="${matchId}"][data-team="away"]`);
+                if(homeInput) homeInput.value = bet.home ?? '';
+                if(awayInput) awayInput.value = bet.away ?? '';
+            });
+
+            const tabs = participantCard.querySelectorAll('.tab-button');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    participantCard.querySelectorAll('.group-content').forEach(c => c.classList.add('hidden'));
+                    document.getElementById(`group-content-${docId}-${tab.dataset.group}`).classList.remove('hidden');
+                });
+            });
+            if(tabs.length > 0) tabs[0].click();
+            
+            updateAllStandings(docId);
+        }
+
+        function updateAllStandings(docId) {
+            const participantCard = document.getElementById(`participant-${docId}`);
+            if (!participantCard) return;
+            const bets = {};
+            participantCard.querySelectorAll('input[data-match-id]').forEach(input => {
+                const matchId = input.dataset.matchId;
+                if(!bets[matchId]) bets[matchId] = {};
+                bets[matchId][input.dataset.team] = input.value !== '' ? parseInt(input.value) : null;
+            });
+
+            const groups = [...new Set(matches.map(m => m.group))].filter(g => g.length === 1); 
+            groups.forEach(group => {
+                updateStandings(docId, group, bets);
+            });
+        }
+        
+        function updateStandings(docId, group, bets) {
+            const groupMatches = matches.filter(m => m.group === group);
+            const standings = {};
+
+            groupMatches.forEach(m => {
+                if(!standings[m.home]) standings[m.home] = { P: 0, V: 0, E: 0, D: 0, GP: 0, GC: 0 };
+                if(!standings[m.away]) standings[m.away] = { P: 0, V: 0, E: 0, D: 0, GP: 0, GC: 0 };
+                
+                const homeScore = bets[m.id]?.home;
+                const awayScore = bets[m.id]?.away;
+
+                if (typeof homeScore === 'number' && typeof awayScore === 'number') {
+                    standings[m.home].GP += homeScore; standings[m.home].GC += awayScore;
+                    standings[m.away].GP += awayScore; standings[m.away].GC += homeScore;
+
+                    if (homeScore > awayScore) { standings[m.home].P += 3; standings[m.home].V++; standings[m.away].D++; }
+                    else if (awayScore > homeScore) { standings[m.away].P += 3; standings[m.away].V++; standings[m.home].D++; }
+                    else { standings[m.home].P++; standings[m.home].E++; standings[m.away].P++; standings[m.away].E++; }
+                }
+            });
+            
+            const sortedTeams = Object.entries(standings).sort(([,a], [,b]) => b.P - a.P || (b.GP - b.GC) - (a.GP - a.GC) || b.GP - a.GP);
+            
+            const tableBody = document.getElementById(`standings-${docId}-${group.replace(" ","_")}`);
+            if(tableBody) {
+                tableBody.innerHTML = sortedTeams.map(([team, stats]) => `
+                    <tr class="border-b border-gray-700"><td class="p-1">${team}</td><td>${stats.P}</td><td>${stats.V}</td><td>${stats.E}</td><td>${stats.D}</td><td>${stats.GP-stats.GC}</td></tr>
+                `).join('');
+            }
+        }
+        
+        onAuthStateChanged(auth, user => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('user-id').textContent = user.uid;
+                
+                onSnapshot(collection(db, "bolao"), snapshot => {
+                    const allParticipants = [];
+                    let hasCurrentUserCard = false;
+                    snapshot.forEach(doc => {
+                        if (doc.id !== 'official') {
+                            allParticipants.push({ id: doc.id, ...doc.data() });
+                            if (doc.id === currentUser.uid) hasCurrentUserCard = true;
+                        }
+                    });
+                    
+                    document.getElementById('add-participant').style.display = hasCurrentUserCard ? 'none' : 'block';
+                    document.getElementById('participants-container').innerHTML = '';
+                    allParticipants.forEach(p => renderParticipant(p.id, p));
+
+                    onSnapshot(doc(db, "bolao", "official"), (officialDoc) => {
+                         if (officialDoc.exists()) {
+                            const officialData = officialDoc.data();
+                            document.querySelectorAll('#official-results-container input, #official-champion, #official-vice').forEach(el => {
+                                const [, id, team] = el.id.split('-');
+                                if (el.id === 'official-champion') el.value = officialData.champions?.champion ?? '';
+                                else if (el.id === 'official-vice') el.value = officialData.champions?.vice ?? '';
+                                else if(officialData.bets && officialData.bets[id]) el.value = officialData.bets[id][team] ?? '';
+                            });
+                            calculateAndDisplayRanking(allParticipants, officialData);
+                         }
+                    });
+                });
+
+                document.getElementById('add-participant').onclick = () => {
+                    setDoc(doc(db, "bolao", currentUser.uid), {
+                        name: `Participante ${currentUser.uid.substring(0, 5)}`,
+                        bets: {},
+                        champions: { champion: '', vice: '' }
+                    });
+                };
+
+                document.body.addEventListener('change', (e) => {
+                    if(e.target.classList.contains('participant-input')) {
+                        const { doc: docId, field, matchId, team } = e.target.dataset;
+                        if (docId !== currentUser?.uid) return;
+                        
+                        let updateData = {};
+                        if(field) updateData[field === 'name' ? 'name' : `champions.${field}`] = e.target.value;
+                        else if (matchId) updateData[`bets.${matchId}.${team}`] = e.target.value === '' ? null : parseInt(e.target.value);
+
+                        updateDoc(doc(db, "bolao", docId), updateData);
+                        updateAllStandings(docId);
+                    }
+                });
+            } else {
+                signInAnonymously(auth);
+            }
+        });
+        
+        function calculateAndDisplayRanking(allParticipants, officialData) {
+            const officialBets = officialData.bets || {};
+            const officialChampions = officialData.champions || {};
+
+            const rankedList = allParticipants.map(p => {
+                let score = 0;
+                Object.entries(p.bets || {}).forEach(([matchId, bet]) => {
+                    const officialBet = officialBets[matchId];
+                    if(!officialBet || typeof bet.home !== 'number' || typeof bet.away !== 'number') return;
+                    
+                    if (bet.home === officialBet.home && bet.away === officialBet.away) { score += 10; }
+                    else {
+                        const betWinner = bet.home > bet.away ? 'H' : bet.away > bet.home ? 'A' : 'D';
+                        const offWinner = officialBet.home > officialBet.away ? 'H' : officialBet.away > officialBet.home ? 'A' : 'D';
+                        if (betWinner === offWinner) {
+                            if (betWinner !== 'D' && (bet.home === officialBet.home || bet.away === officialBet.away)) score += 4;
+                            else score += 3;
+                        }
+                    }
+                });
+                if(p.champions?.champion && officialChampions.champion && p.champions.champion.toLowerCase() === officialChampions.champion.toLowerCase()) score += 25;
+                if(p.champions?.vice && officialChampions.vice && p.champions.vice.toLowerCase() === officialChampions.vice.toLowerCase()) score += 15;
+                
+                return { name: p.name, score };
+            }).sort((a,b) => b.score - a.score);
+
+            const container = document.getElementById('ranking-container');
+            container.innerHTML = rankedList.length > 0 ? rankedList.map((p, i) => `
+                 <div class="flex justify-between items-center p-2 rounded-md ${i % 2 === 0 ? 'bg-gray-700' : 'bg-gray-800'}">
+                    <div class="flex items-center"><span class="font-bold text-sm mr-2 w-6 text-center">${i + 1}º</span><span>${p.name || 'Sem Nome'}</span></div>
+                    <span class="font-bold text-lg text-green-400">${p.score} pts</span>
+                 </div>
+            `).join('') : '<p class="text-gray-400">Nenhum participante ainda.</p>';
+        }
+        
+        renderOfficialResults();
+
+    </script>
+</body>
+</html>
