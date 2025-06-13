@@ -14,10 +14,6 @@
             --bg-card: #1F2937;
             --border-color: #374151;
             --text-main: #F9FAFB;
-            --text-secondary: #9CA3AF;
-            --accent-blue: #3B82F6;
-            --accent-green: #22C55E;
-            --accent-yellow: #EAB308;
         }
         body {
             font-family: 'Inter', sans-serif;
@@ -32,14 +28,6 @@
             background-color: var(--bg-dark);
             border: 1px solid var(--border-color);
             color: var(--text-main);
-        }
-        input::-webkit-outer-spin-button,
-        input::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-        input[type=number] {
-            -moz-appearance: textfield;
         }
     </style>
 </head>
@@ -56,13 +44,11 @@
 
     <div class="max-w-7xl mx-auto space-y-6">
 
-        <!-- CABEÇALHO -->
         <header class="text-center py-4">
             <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-white">Bolão do Mundial de Clubes 2025</h1>
             <p class="text-lg text-gray-400 mt-2">O bolão definitivo para o super mundial!</p>
         </header>
 
-        <!-- SEÇÃO DE REGRAS E RANKING -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="lg:col-span-1 card p-4 sm:p-6 rounded-lg">
                 <h2 class="text-xl font-bold mb-3 text-white">Regras e Pontuação</h2>
@@ -88,12 +74,19 @@
                 </div>
             </div>
         </div>
+        
+        <!-- NOVA SEÇÃO: TABELAS DE CLASSIFICAÇÃO OFICIAL -->
+        <div class="card p-4 sm:p-6 rounded-lg">
+            <h2 class="text-xl font-bold mb-4 text-white">Tabela de Classificação Oficial</h2>
+            <div id="official-standings-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                <!-- Tabelas dos grupos serão geradas aqui -->
+            </div>
+        </div>
 
-        <!-- SEÇÃO DE RESULTADOS OFICIAIS (ADMIN) -->
         <div class="card p-4 sm:p-6 rounded-lg">
             <h2 class="text-xl font-bold mb-4 text-white">Resultados Oficiais (Administrador)</h2>
             <div id="official-results-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 text-sm">
-                <!-- Jogos serão inseridos aqui pelo JavaScript -->
+                <!-- Inputs dos jogos serão inseridos aqui -->
             </div>
              <div class="mt-4 pt-4 border-t border-gray-700">
                 <h3 class="font-bold mb-2">Campeões</h3>
@@ -110,7 +103,6 @@
             </div>
         </div>
 
-        <!-- SEÇÃO DE PALPITES DOS PARTICIPantes -->
         <div class="card p-4 sm:p-6 rounded-lg">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                 <h2 class="text-xl font-bold text-white">Palpites dos Participantes</h2>
@@ -133,9 +125,6 @@
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         import { getFirestore, doc, onSnapshot, setDoc, collection, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         
-        // ==========================================================================================
-        //  ATENÇÃO: SUA CONFIGURAÇÃO DO FIREBASE VAI AQUI
-        // ==========================================================================================
         const firebaseConfig = {
           apiKey: "AIzaSyDQdsXY1EsN0HfIJNOgMeuij7_ZoWZDQ4w",
           authDomain: "mundial-bolao.firebaseapp.com",
@@ -157,50 +146,69 @@
         let currentUser = null;
 
         const matches = [
-            // GRUPO A
-            { id: 'm1', group: 'A', home: 'Palmeiras', away: 'Porto' }, { id: 'm2', group: 'A', home: 'Inter Miami', away: 'Al Ahly' },
-            { id: 'm3', group: 'A', home: 'Palmeiras', away: 'Inter Miami' }, { id: 'm4', group: 'A', home: 'Al Ahly', away: 'Porto' },
-            { id: 'm5', group: 'A', home: 'Porto', away: 'Inter Miami' }, { id: 'm6', group: 'A', home: 'Al Ahly', away: 'Palmeiras' },
-            // GRUPO B
-            { id: 'm7', group: 'B', home: 'PSG', away: 'Atlético de Madrid' }, { id: 'm8', group: 'B', home: 'Botafogo', away: 'Seattle Sounders' },
-            { id: 'm9', group: 'B', home: 'PSG', away: 'Botafogo' }, { id: 'm10', group: 'B', home: 'Seattle Sounders', away: 'Atlético de Madrid' },
-            { id: 'm11', group: 'B', home: 'Atlético de Madrid', away: 'Botafogo' }, { id: 'm12', group: 'B', home: 'Seattle Sounders', away: 'PSG' },
-            // GRUPO C
-            { id: 'm13', group: 'C', home: 'Bayern de Munique', away: 'Auckland City' }, { id: 'm14', group: 'C', home: 'Boca Juniors', away: 'Benfica' },
-            { id: 'm15', group: 'C', home: 'Bayern de Munique', away: 'Boca Juniors' }, { id: 'm16', group: 'C', home: 'Benfica', away: 'Auckland City' },
-            { id: 'm17', group: 'C', home: 'Auckland City', away: 'Boca Juniors' }, { id: 'm18', group: 'C', home: 'Benfica', away: 'Bayern de Munique' },
-            // GRUPO D
-            { id: 'm19', group: 'D', home: 'Flamengo', away: 'Espérance' }, { id: 'm20', group: 'D', home: 'Chelsea', away: 'Los Angeles FC' },
-            { id: 'm21', group: 'D', home: 'Flamengo', away: 'Chelsea' }, { id: 'm22', group: 'D', home: 'Los Angeles FC', away: 'Espérance' },
-            { id: 'm23', group: 'D', home: 'Espérance', away: 'Chelsea' }, { id: 'm24', group: 'D', home: 'Los Angeles FC', away: 'Flamengo' },
-            // GRUPO E
-            { id: 'm25', group: 'E', home: 'River Plate', away: 'Urawa Red' }, { id: 'm26', group: 'E', home: 'Inter de Milão', away: 'Monterrey' },
-            { id: 'm27', group: 'E', home: 'River Plate', away: 'Inter de Milão' }, { id: 'm28', group: 'E', home: 'Monterrey', away: 'Urawa Red' },
-            { id: 'm29', group: 'E', home: 'Urawa Red', away: 'Inter de Milão' }, { id: 'm30', group: 'E', home: 'Monterrey', away: 'River Plate' },
-            // GRUPO F
-            { id: 'm31', group: 'F', home: 'Fluminense', away: 'B. Dortmund' }, { id: 'm32', group: 'F', home: 'Ulsan HD', away: 'Mamelodi' },
-            { id: 'm33', group: 'F', home: 'Fluminense', away: 'Ulsan HD' }, { id: 'm34', group: 'F', home: 'Mamelodi', away: 'B. Dortmund' },
-            { id: 'm35', group: 'F', home: 'B. Dortmund', away: 'Ulsan HD' }, { id: 'm36', group: 'F', home: 'Mamelodi', away: 'Fluminense' },
-            // GRUPO G
-            { id: 'm37', group: 'G', home: 'Man. City', away: 'Wydad' }, { id: 'm38', group: 'G', home: 'Juventus', away: 'Al Ain' },
-            { id: 'm39', group: 'G', home: 'Man. City', away: 'Juventus' }, { id: 'm40', group: 'G', home: 'Al Ain', away: 'Wydad' },
-            { id: 'm41', group: 'G', home: 'Wydad', away: 'Juventus' }, { id: 'm42', group: 'G', home: 'Al Ain', away: 'Man. City' },
-            // GRUPO H
-            { id: 'm43', group: 'H', home: 'Real Madrid', away: 'Al Hilal' }, { id: 'm44', group: 'H', home: 'Pachuca', away: 'RB Salzburg' },
-            { id: 'm45', group: 'H', home: 'Real Madrid', away: 'Pachuca' }, { id: 'm46', group: 'H', home: 'RB Salzburg', away: 'Al Hilal' },
-            { id: 'm47', group: 'H', home: 'Al Hilal', away: 'Pachuca' }, { id: 'm48', group: 'H', home: 'RB Salzburg', away: 'Real Madrid' },
+            // FASE DE GRUPOS
+            { id: 'm1', group: 'A', home: 'Palmeiras', away: 'Porto' }, { id: 'm2', group: 'A', home: 'Inter Miami', away: 'Al Ahly' }, { id: 'm3', group: 'A', home: 'Palmeiras', away: 'Inter Miami' }, { id: 'm4', group: 'A', home: 'Al Ahly', away: 'Porto' }, { id: 'm5', group: 'A', home: 'Porto', away: 'Inter Miami' }, { id: 'm6', group: 'A', home: 'Al Ahly', away: 'Palmeiras' },
+            { id: 'm7', group: 'B', home: 'PSG', away: 'Atlético de Madrid' }, { id: 'm8', group: 'B', home: 'Botafogo', away: 'Seattle Sounders' }, { id: 'm9', group: 'B', home: 'PSG', away: 'Botafogo' }, { id: 'm10', group: 'B', home: 'Seattle Sounders', away: 'Atlético de Madrid' }, { id: 'm11', group: 'B', home: 'Atlético de Madrid', away: 'Botafogo' }, { id: 'm12', group: 'B', home: 'Seattle Sounders', away: 'PSG' },
+            { id: 'm13', group: 'C', home: 'Bayern de Munique', away: 'Auckland City' }, { id: 'm14', group: 'C', home: 'Boca Juniors', away: 'Benfica' }, { id: 'm15', group: 'C', home: 'Bayern de Munique', away: 'Boca Juniors' }, { id: 'm16', group: 'C', home: 'Benfica', away: 'Auckland City' }, { id: 'm17', group: 'C', home: 'Auckland City', away: 'Boca Juniors' }, { id: 'm18', group: 'C', home: 'Benfica', away: 'Bayern de Munique' },
+            { id: 'm19', group: 'D', home: 'Flamengo', away: 'Espérance' }, { id: 'm20', group: 'D', home: 'Chelsea', away: 'Los Angeles FC' }, { id: 'm21', group: 'D', home: 'Flamengo', away: 'Chelsea' }, { id: 'm22', group: 'D', home: 'Los Angeles FC', away: 'Espérance' }, { id: 'm23', group: 'D', home: 'Espérance', away: 'Chelsea' }, { id: 'm24', group: 'D', home: 'Los Angeles FC', away: 'Flamengo' },
+            { id: 'm25', group: 'E', home: 'River Plate', away: 'Urawa Red' }, { id: 'm26', group: 'E', home: 'Inter de Milão', away: 'Monterrey' }, { id: 'm27', group: 'E', home: 'River Plate', away: 'Inter de Milão' }, { id: 'm28', group: 'E', home: 'Monterrey', away: 'Urawa Red' }, { id: 'm29', group: 'E', home: 'Urawa Red', away: 'Inter de Milão' }, { id: 'm30', group: 'E', home: 'Monterrey', away: 'River Plate' },
+            { id: 'm31', group: 'F', home: 'Fluminense', away: 'B. Dortmund' }, { id: 'm32', group: 'F', home: 'Ulsan HD', away: 'Mamelodi' }, { id: 'm33', group: 'F', home: 'Fluminense', away: 'Ulsan HD' }, { id: 'm34', group: 'F', home: 'Mamelodi', away: 'B. Dortmund' }, { id: 'm35', group: 'F', home: 'B. Dortmund', away: 'Ulsan HD' }, { id: 'm36', group: 'F', home: 'Mamelodi', away: 'Fluminense' },
+            { id: 'm37', group: 'G', home: 'Man. City', away: 'Wydad' }, { id: 'm38', group: 'G', home: 'Juventus', away: 'Al Ain' }, { id: 'm39', group: 'G', home: 'Man. City', away: 'Juventus' }, { id: 'm40', group: 'G', home: 'Al Ain', away: 'Wydad' }, { id: 'm41', group: 'G', home: 'Wydad', away: 'Juventus' }, { id: 'm42', group: 'G', home: 'Al Ain', away: 'Man. City' },
+            { id: 'm43', group: 'H', home: 'Real Madrid', away: 'Al Hilal' }, { id: 'm44', group: 'H', home: 'Pachuca', away: 'RB Salzburg' }, { id: 'm45', group: 'H', home: 'Real Madrid', away: 'Pachuca' }, { id: 'm46', group: 'H', home: 'RB Salzburg', away: 'Al Hilal' }, { id: 'm47', group: 'H', home: 'Al Hilal', away: 'Pachuca' }, { id: 'm48', group: 'H', home: 'RB Salzburg', away: 'Real Madrid' },
             // MATA-MATA
-            { id: 'm49', group: 'Oitavas', home: '1º Grupo A', away: '2º Grupo B' }, { id: 'm50', group: 'Oitavas', home: '1º Grupo C', away: '2º Grupo D' },
-            { id: 'm51', group: 'Oitavas', home: '1º Grupo E', away: '2º Grupo F' }, { id: 'm52', group: 'Oitavas', home: '1º Grupo G', away: '2º Grupo H' },
-            { id: 'm53', group: 'Oitavas', home: '1º Grupo B', away: '2º Grupo A' }, { id: 'm54', group: 'Oitavas', home: '1º Grupo D', away: '2º Grupo C' },
-            { id: 'm55', group: 'Oitavas', home: '1º Grupo F', away: '2º Grupo E' }, { id: 'm56', group: 'Oitavas', home: '1º Grupo H', away: '2º Grupo G' },
-            { id: 'm57', group: 'Quartas', home: 'Venc. Oitavas 1', away: 'Venc. Oitavas 2' }, { id: 'm58', group: 'Quartas', home: 'Venc. Oitavas 3', away: 'Venc. Oitavas 4' },
-            { id: 'm59', group: 'Quartas', home: 'Venc. Oitavas 5', away: 'Venc. Oitavas 6' }, { id: 'm60', group: 'Quartas', home: 'Venc. Oitavas 7', away: 'Venc. Oitavas 8' },
-            { id: 'm61', group: 'Semi', home: 'Venc. Quartas 1', away: 'Venc. Quartas 2' }, { id: 'm62', group: 'Semi', home: 'Venc. Quartas 3', away: 'Venc. Quartas 4' },
-            { id: 'm63', group: 'Final', home: 'Venc. Semi 1', away: 'Venc. Semi 2' },
+            { id: 'm49', stage: 'Oitavas', home: '1º Grupo A', away: '2º Grupo B' }, { id: 'm50', stage: 'Oitavas', home: '1º Grupo C', away: '2º Grupo D' },
+            { id: 'm51', stage: 'Oitavas', home: '1º Grupo E', away: '2º Grupo F' }, { id: 'm52', stage: 'Oitavas', home: '1º Grupo G', away: '2º Grupo H' },
+            { id: 'm53', stage: 'Oitavas', home: '1º Grupo B', away: '2º Grupo A' }, { id: 'm54', stage: 'Oitavas', home: '1º Grupo D', away: '2º Grupo C' },
+            { id: 'm55', stage: 'Oitavas', home: '1º Grupo F', away: '2º Grupo E' }, { id: 'm56', stage: 'Oitavas', home: '1º Grupo H', away: '2º Grupo G' },
+            { id: 'm57', stage: 'Quartas', home: 'Vencedor m49', away: 'Vencedor m50' }, { id: 'm58', stage: 'Quartas', home: 'Vencedor m51', away: 'Vencedor m52' },
+            { id: 'm59', stage: 'Quartas', home: 'Vencedor m53', away: 'Vencedor m54' }, { id: 'm60', stage: 'Quartas', home: 'Vencedor m55', away: 'Vencedor m56' },
+            { id: 'm61', stage: 'Semi', home: 'Vencedor m57', away: 'Vencedor m58' }, { id: 'm62', stage: 'Semi', home: 'Vencedor m59', away: 'Vencedor m60' },
+            { id: 'm63', stage: 'Final', home: 'Vencedor m61', away: 'Vencedor m62' },
         ];
         
-        function renderOfficialResults() {
+        // --- FUNÇÕES DE LÓGICA ---
+        function calculateStandings(group, bets) {
+            const groupMatches = matches.filter(m => m.group === group);
+            if (groupMatches.length === 0) return [];
+            const teams = [...new Set(groupMatches.flatMap(m => [m.home, m.away]))];
+            const standings = {};
+            teams.forEach(t => { standings[t] = { P: 0, J: 0, V: 0, E: 0, D: 0, GP: 0, GC: 0, SG: 0 }; });
+
+            groupMatches.forEach(m => {
+                const bet = bets[m.id];
+                if (typeof bet?.home === 'number' && typeof bet?.away === 'number') {
+                    standings[m.home].J++; standings[m.away].J++;
+                    standings[m.home].GP += bet.home; standings[m.home].GC += bet.away;
+                    standings[m.away].GP += bet.away; standings[m.away].GC += bet.home;
+                    if (bet.home > bet.away) { standings[m.home].P += 3; standings[m.home].V++; standings[m.away].D++; }
+                    else if (bet.away > bet.home) { standings[m.away].P += 3; standings[m.away].V++; standings[m.home].D++; }
+                    else { standings[m.home].P++; standings[m.home].E++; standings[m.away].P++; standings[m.away].E++; }
+                }
+            });
+            Object.values(standings).forEach(s => s.SG = s.GP - s.GC);
+            return Object.entries(standings).sort(([,a], [,b]) => b.P - a.P || b.SG - a.SG || b.GP - a.GP);
+        }
+
+        // --- FUNÇÕES DE RENDERIZAÇÃO ---
+        function renderStandings(containerId, bets) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            const groups = [...new Set(matches.filter(m => m.group).map(m => m.group))];
+            let html = '';
+            groups.forEach(g => {
+                const groupStandings = calculateStandings(g, bets);
+                html += `<div><h3 class="font-bold mb-2 text-lg">Grupo ${g}</h3><table class="w-full text-xs text-left">
+                    <thead class="bg-gray-700"><tr><th class="p-2">Time</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>SG</th></tr></thead>
+                    <tbody>`;
+                groupStandings.forEach(([team, stats]) => {
+                    html += `<tr class="border-b border-gray-700"><td class="p-2 font-semibold">${team}</td><td>${stats.P}</td><td>${stats.J}</td><td>${stats.V}</td><td>${stats.E}</td><td>${stats.D}</td><td>${stats.SG}</td></tr>`;
+                });
+                html += `</tbody></table></div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function renderOfficialResults(officialBets) {
             const container = document.getElementById('official-results-container');
             container.innerHTML = matches.map(m => `
                 <div class="flex items-center justify-between text-sm p-2 bg-gray-800 rounded-md">
@@ -218,13 +226,15 @@
                     if (!currentUser) return; 
                     const officialData = { bets: {}, champions: {} };
                     matches.forEach(m => {
-                        const home = document.getElementById(`official-${m.id}-home`).value;
-                        const away = document.getElementById(`official-${m.id}-away`).value;
-                        if (home !== "" && away !== "") officialData.bets[m.id] = { home: parseInt(home), away: parseInt(away) };
+                        const homeInput = document.getElementById(`official-${m.id}-home`);
+                        const awayInput = document.getElementById(`official-${m.id}-away`);
+                        if (homeInput && awayInput && homeInput.value !== "" && awayInput.value !== "") {
+                             officialData.bets[m.id] = { home: parseInt(homeInput.value), away: parseInt(awayInput.value) };
+                        }
                     });
                     officialData.champions.champion = document.getElementById('official-champion').value;
                     officialData.champions.vice = document.getElementById('official-vice').value;
-                    setDoc(doc(db, "bolao", "official"), officialData);
+                    setDoc(doc(db, "bolao", "official"), officialData, { merge: true });
                 });
             });
         }
@@ -240,15 +250,16 @@
             }
             
             const groupedMatches = matches.reduce((acc, m) => {
-                if(!acc[m.group]) acc[m.group] = [];
-                acc[m.group].push(m);
+                const key = m.group || m.stage;
+                if(!acc[key]) acc[key] = [];
+                acc[key].push(m);
                 return acc;
             }, {});
 
             let matchesHTML = '';
-             for (const group in groupedMatches) {
-                matchesHTML += `<div class="mb-4"><h4 class="font-bold text-lg text-gray-300 border-b border-gray-700 pb-1 mb-2">Grupo ${group}</h4><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">`;
-                groupedMatches[group].forEach(match => {
+             for (const groupName in groupedMatches) {
+                matchesHTML += `<div class="mb-4"><h4 class="font-bold text-lg text-gray-300 border-b border-gray-700 pb-1 mb-2">${groupName}</h4><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">`;
+                groupedMatches[groupName].forEach(match => {
                     matchesHTML += `
                         <div class="flex items-center justify-between text-sm p-2 bg-gray-800 rounded-md">
                             <span class="text-right flex-1 truncate pr-2">${match.home}</span>
@@ -271,6 +282,10 @@
                     <input type="text" value="${data.champions?.vice || ''}" class="input-text flex-grow rounded p-2" data-doc="${docId}" data-field="vice" placeholder="Palpite para Vice" ${docId !== currentUser?.uid ? 'disabled' : ''}>
                 </div>
                 <div class="p-3 bg-gray-900 rounded-b-lg">
+                    <div class="mb-6">
+                        <h3 class="text-xl font-bold mb-4">Minha Simulação de Classificação</h3>
+                        <div id="participant-standings-${docId}" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6"></div>
+                    </div>
                     ${matchesHTML}
                 </div>
             `;
@@ -281,6 +296,7 @@
                 if(homeInput) homeInput.value = bet.home ?? '';
                 if(awayInput) awayInput.value = bet.away ?? '';
             });
+            renderStandings(`participant-standings-${docId}`, data.bets || {});
         }
         
         onAuthStateChanged(auth, user => {
@@ -289,20 +305,24 @@
                 document.getElementById('user-id').textContent = user.uid;
                 
                 document.getElementById('add-participant').addEventListener('click', () => {
-                    if (currentUser && currentUser.uid) {
+                    if (currentUser) {
                         setDoc(doc(db, "bolao", currentUser.uid), {
                             name: `Participante ${currentUser.uid.substring(0, 5)}`,
                             bets: {},
                             champions: { champion: '', vice: '' }
-                        }).catch(error => console.error("Erro ao criar o documento:", error));
+                        });
                     }
                 });
 
                 onSnapshot(collection(db, "bolao"), snapshot => {
                     const allParticipants = [];
                     let hasCurrentUserCard = false;
+                    let officialData = {};
+
                     snapshot.forEach(doc => {
-                        if (doc.id !== 'official') {
+                        if (doc.id === 'official') {
+                            officialData = doc.data();
+                        } else {
                             allParticipants.push({ id: doc.id, ...doc.data() });
                             if (doc.id === currentUser.uid) hasCurrentUserCard = true;
                         }
@@ -311,37 +331,43 @@
                     document.getElementById('add-participant').style.display = hasCurrentUserCard ? 'none' : 'block';
                     document.getElementById('participants-container').innerHTML = '';
                     allParticipants.forEach(p => renderParticipant(p.id, p));
-
-                    onSnapshot(doc(db, "bolao", "official"), (officialDoc) => {
-                         if (officialDoc.exists()) {
-                            const officialData = officialDoc.data();
-                            document.querySelectorAll('#official-results-container input, #official-champion, #official-vice').forEach(el => {
-                                const [, id, team] = el.id.split('-');
-                                if (el.id === 'official-champion') el.value = officialData.champions?.champion ?? '';
-                                else if (el.id === 'official-vice') el.value = officialData.champions?.vice ?? '';
-                                else if(officialData.bets && officialData.bets[id]) el.value = officialData.bets[id][team] ?? '';
-                            });
-                            calculateAndDisplayRanking(allParticipants, officialData);
-                         }
+                    
+                    renderStandings('official-standings-container', officialData.bets || {});
+                    renderOfficialResults(officialData.bets || {});
+                    document.querySelectorAll('#official-results-container input, #official-champion, #official-vice').forEach(el => {
+                        const [, id, team] = el.id.split('-');
+                        if (el.id === 'official-champion') el.value = officialData.champions?.champion ?? '';
+                        else if (el.id === 'official-vice') el.value = officialData.champions?.vice ?? '';
+                        else if(officialData.bets && officialData.bets[id]) el.value = officialData.bets[id][team] ?? '';
                     });
+
+                    calculateAndDisplayRanking(allParticipants, officialData);
                 });
 
                 document.body.addEventListener('change', (e) => {
                     const target = e.target;
-                    if(target.closest('.participant-card') || target.closest('#official-results-container')) {
-                        const docId = target.closest('[data-doc]')?.dataset.doc || (target.id.startsWith('official-') ? 'official' : null);
-                        if(docId === 'official' || docId === currentUser?.uid) {
-                            const field = target.dataset.field;
-                            const matchId = target.dataset.matchId;
-                            const team = target.dataset.team;
-                            
-                            let updateData = {};
-                            if(field) updateData[field === 'name' ? 'name' : `champions.${field}`] = target.value;
-                            else if (matchId) updateData[`bets.${matchId}.${team}`] = target.value === '' ? null : parseInt(target.value);
+                    const docId = target.closest('[data-doc]')?.dataset.doc;
+                    if(docId && (docId === currentUser?.uid)) {
+                        const field = target.dataset.field;
+                        const matchId = target.dataset.matchId;
+                        const team = target.dataset.team;
+                        
+                        let updateData = {};
+                        if(field) updateData[field === 'name' ? 'name' : `champions.${field}`] = target.value;
+                        else if (matchId) updateData[`bets.${matchId}.${team}`] = target.value === '' ? null : parseInt(target.value);
 
-                            if(Object.keys(updateData).length > 0) {
-                                updateDoc(doc(db, "bolao", docId), updateData);
-                            }
+                        if(Object.keys(updateData).length > 0) {
+                            updateDoc(doc(db, "bolao", docId), updateData).then(() => {
+                                // Atualiza a simulação de tabela do participante
+                                const currentBets = {};
+                                document.querySelectorAll(`#participant-${docId} input[data-match-id]`).forEach(input => {
+                                    const mId = input.dataset.matchId;
+                                    const t = input.dataset.team;
+                                    if(!currentBets[mId]) currentBets[mId] = {};
+                                    currentBets[mId][t] = input.value !== '' ? parseInt(input.value) : null;
+                                });
+                                renderStandings(`participant-standings-${docId}`, currentBets);
+                            });
                         }
                     }
                 });
@@ -384,8 +410,6 @@
                  </div>
             `).join('') : '<p class="text-gray-400">Nenhum participante ainda.</p>';
         }
-        
-        renderOfficialResults();
 
     </script>
 </body>
