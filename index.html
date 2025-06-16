@@ -29,6 +29,14 @@
             border: 1px solid var(--border-color);
             color: var(--text-main);
         }
+        .input-score:disabled, .input-text:disabled {
+            background-color: #374151;
+            cursor: not-allowed;
+            color: #9ca3af;
+        }
+        #deadline-toast {
+            transition: opacity 0.5s, transform 0.5s;
+        }
     </style>
 </head>
 <body class="p-2 sm:p-4 md:p-6">
@@ -41,6 +49,12 @@
             <p class="text-sm text-red-200">Procure pela variável <code class="bg-red-900 px-2 py-1 rounded">firebaseConfig</code> no código-fonte e substitua os valores de exemplo pelos seus valores reais.</p>
         </div>
     </div>
+    
+    <!-- AVISO DE PRAZO EXPIRADO -->
+    <div id="deadline-toast" class="fixed bottom-5 right-5 bg-red-600 text-white py-2 px-4 rounded-lg shadow-lg opacity-0 translate-y-10">
+        O prazo para alterar palpites já encerrou!
+    </div>
+
 
     <div class="max-w-7xl mx-auto space-y-6">
 
@@ -142,10 +156,7 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
         
-        // --- CONFIGURAÇÃO DO PRAZO ---
-        // O formato é 'ANO-MÊS-DIATTHH:MM:SSZ' (Horário UTC). 
-        // '2025-06-14T21:00:00Z' corresponde a 14 de Junho de 2025, às 18:00 no horário de Brasília (UTC-3).
-        const DEADLINE = new Date('2025-06-15T15:00:00Z');
+        const DEADLINE = new Date('2025-06-14T21:00:00Z');
         
         let currentUser = null;
 
@@ -170,7 +181,14 @@
             { id: 'm63', stage: 'Final', home: 'Venc. Semi 1', away: 'Venc. Semi 2' },
         ];
         
-        // --- FUNÇÕES DE LÓGICA ---
+        function showDeadlineToast() {
+            const toast = document.getElementById('deadline-toast');
+            toast.classList.remove('opacity-0', 'translate-y-10');
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-10');
+            }, 3000);
+        }
+
         function calculateStandings(group, bets) {
             const groupMatches = matches.filter(m => m.group === group);
             if (groupMatches.length === 0) return [];
@@ -193,7 +211,6 @@
             return Object.entries(standings).sort(([,a], [,b]) => b.P - a.P || b.SG - a.SG || b.GP - a.GP);
         }
 
-        // --- FUNÇÕES DE RENDERIZAÇÃO ---
         function renderStandings(containerId, bets) {
             const container = document.getElementById(containerId);
             if (!container) return;
@@ -212,7 +229,7 @@
             container.innerHTML = html;
         }
 
-        function buildOfficialResultsHTML() {
+        function buildAndListenOfficialResults() {
             const container = document.getElementById('official-results-container');
             container.innerHTML = matches.map(m => `
                 <div class="flex items-center justify-between text-sm p-2 bg-gray-800 rounded-md">
@@ -224,10 +241,8 @@
                     </div>
                 </div>
             `).join('');
-        }
 
-        function addOfficialResultsListeners() {
-             document.querySelectorAll('#official-results-container input, #official-champion, #official-vice').forEach(el => {
+            document.querySelectorAll('#official-results-container input, #official-champion, #official-vice').forEach(el => {
                 el.addEventListener('change', () => {
                     if (!currentUser) return; 
                     const officialData = { bets: {}, champions: {} };
@@ -243,15 +258,6 @@
                     officialData.lastUpdatedAt = serverTimestamp();
                     setDoc(doc(db, "bolao", "official"), officialData, { merge: true });
                 });
-            });
-        }
-        
-        function updateOfficialInputs(officialData) {
-             document.querySelectorAll('#official-results-container input, #official-champion, #official-vice').forEach(el => {
-                const [, id, team] = el.id.split('-');
-                if (el.id === 'official-champion') el.value = officialData.champions?.champion ?? '';
-                else if (el.id === 'official-vice') el.value = officialData.champions?.vice ?? '';
-                else if(officialData.bets && officialData.bets[id]) el.value = officialData.bets[id][team] ?? '';
             });
         }
         
@@ -272,6 +278,9 @@
                 return acc;
             }, {});
 
+            const isPastDeadline = new Date() > DEADLINE;
+            const disabledAttribute = (docId !== currentUser?.uid || isPastDeadline) ? 'disabled' : '';
+
             let matchesHTML = '';
              for (const groupName in groupedMatches) {
                 if (groupName.length === 1 || ['Oitavas', 'Quartas', 'Semi', 'Final'].includes(groupName)) {
@@ -281,9 +290,9 @@
                             <div class="flex items-center justify-between text-sm p-2 bg-gray-800 rounded-md">
                                 <span class="text-right flex-1 truncate pr-2">${match.home}</span>
                                 <div class="flex items-center gap-1">
-                                    <input type="number" data-doc="${docId}" data-match-id="${match.id}" data-team="home" class="input-score w-10 text-center rounded participant-input" ${docId !== currentUser?.uid ? 'disabled' : ''}>
+                                    <input type="number" data-doc="${docId}" data-match-id="${match.id}" data-team="home" class="input-score w-10 text-center rounded participant-input" ${disabledAttribute}>
                                     <span>x</span>
-                                    <input type="number" data-doc="${docId}" data-match-id="${match.id}" data-team="away" class="input-score w-10 text-center rounded participant-input" ${docId !== currentUser?.uid ? 'disabled' : ''}>
+                                    <input type="number" data-doc="${docId}" data-match-id="${match.id}" data-team="away" class="input-score w-10 text-center rounded participant-input" ${disabledAttribute}>
                                 </div>
                                 <span class="text-left flex-1 truncate pl-2">${match.away}</span>
                             </div>
@@ -297,9 +306,9 @@
 
             participantCard.innerHTML = `
                 <div class="flex flex-col sm:flex-row gap-4 p-3 bg-gray-800 rounded-t-lg items-center">
-                    <input type="text" value="${data.name || ''}" class="participant-name input-text flex-grow rounded p-2" data-doc="${docId}" data-field="name" placeholder="Nome do Participante" ${docId !== currentUser?.uid ? 'disabled' : ''}>
-                    <input type="text" value="${data.champions?.champion || ''}" class="input-text flex-grow rounded p-2" data-doc="${docId}" data-field="champion" placeholder="Palpite para Campeão" ${docId !== currentUser?.uid ? 'disabled' : ''}>
-                    <input type="text" value="${data.champions?.vice || ''}" class="input-text flex-grow rounded p-2" data-doc="${docId}" data-field="vice" placeholder="Palpite para Vice" ${docId !== currentUser?.uid ? 'disabled' : ''}>
+                    <input type="text" value="${data.name || ''}" class="participant-name input-text flex-grow rounded p-2" data-doc="${docId}" data-field="name" placeholder="Nome do Participante" ${disabledAttribute}>
+                    <input type="text" value="${data.champions?.champion || ''}" class="input-text flex-grow rounded p-2" data-doc="${docId}" data-field="champion" placeholder="Palpite para Campeão" ${disabledAttribute}>
+                    <input type="text" value="${data.champions?.vice || ''}" class="input-text flex-grow rounded p-2" data-doc="${docId}" data-field="vice" placeholder="Palpite para Vice" ${disabledAttribute}>
                     <div class="text-xs text-gray-400 text-right flex-shrink-0">Última atualização: ${lastUpdate}</div>
                 </div>
                 <div class="p-3 bg-gray-900 rounded-b-lg">
@@ -326,6 +335,10 @@
                 document.getElementById('user-id').textContent = user.uid;
                 
                 document.getElementById('add-participant').addEventListener('click', () => {
+                    if (new Date() > DEADLINE) {
+                        showDeadlineToast();
+                        return;
+                    }
                     if (currentUser) {
                         setDoc(doc(db, "bolao", currentUser.uid), {
                             name: `Participante ${currentUser.uid.substring(0, 5)}`,
@@ -337,8 +350,7 @@
                     }
                 });
 
-                buildOfficialResultsHTML();
-                addOfficialResultsListeners();
+                buildAndListenOfficialResults();
 
                 onSnapshot(collection(db, "bolao"), snapshot => {
                     const allParticipants = [];
@@ -354,12 +366,18 @@
                         }
                     });
                     
-                    document.getElementById('add-participant').style.display = hasCurrentUserCard ? 'none' : 'block';
+                    document.getElementById('add-participant').style.display = (hasCurrentUserCard || new Date() > DEADLINE) ? 'none' : 'block';
                     document.getElementById('participants-container').innerHTML = '';
                     allParticipants.forEach(p => renderParticipant(p.id, p));
                     
                     renderStandings('official-standings-container', officialData.bets || {});
-                    updateOfficialInputs(officialData);
+                    
+                    document.querySelectorAll('#official-results-container input, #official-champion, #official-vice').forEach(el => {
+                        const [, id, team] = el.id.split('-');
+                        if (el.id === 'official-champion') el.value = officialData.champions?.champion ?? '';
+                        else if (el.id === 'official-vice') el.value = officialData.champions?.vice ?? '';
+                        else if(officialData.bets && officialData.bets[id]) el.value = officialData.bets[id][team] ?? '';
+                    });
 
                     calculateAndDisplayRanking(allParticipants, officialData);
                 });
@@ -368,6 +386,23 @@
                     const target = e.target;
                     const docId = target.closest('[data-doc]')?.dataset.doc;
                     if(docId && (docId === currentUser?.uid)) {
+                        
+                        if (new Date() > DEADLINE) {
+                            showDeadlineToast();
+                            // Reverte a alteração visualmente
+                            onSnapshot(doc(db, "bolao", docId), (docSnap) => {
+                                if(docSnap.exists()){
+                                    const data = docSnap.data();
+                                    const field = target.dataset.field;
+                                    const matchId = target.dataset.matchId;
+
+                                    if(field) target.value = data.champions[field] ?? '';
+                                    else if(matchId) target.value = data.bets[matchId]?.[target.dataset.team] ?? '';
+                                }
+                            });
+                            return;
+                        }
+
                         const field = target.dataset.field;
                         const matchId = target.dataset.matchId;
                         const team = target.dataset.team;
@@ -434,3 +469,4 @@
     </script>
 </body>
 </html>
+```</immersive>
