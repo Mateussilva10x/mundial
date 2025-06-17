@@ -55,7 +55,6 @@
         O prazo para alterar palpites já encerrou!
     </div>
 
-
     <div class="max-w-7xl mx-auto space-y-6">
 
         <header class="text-center py-4">
@@ -92,14 +91,12 @@
         <div class="card p-4 sm:p-6 rounded-lg">
             <h2 class="text-xl font-bold mb-4 text-white">Tabela de Classificação Oficial</h2>
             <div id="official-standings-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                <!-- Tabelas dos grupos serão geradas aqui -->
             </div>
         </div>
 
-        <div class="card p-4 sm:p-6 rounded-lg">
+        <div id="admin-section" class="card p-4 sm:p-6 rounded-lg hidden">
             <h2 class="text-xl font-bold mb-4 text-white">Resultados Oficiais (Administrador)</h2>
             <div id="official-results-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 text-sm">
-                <!-- Inputs dos jogos serão inseridos aqui -->
             </div>
              <div class="mt-4 pt-4 border-t border-gray-700">
                 <h3 class="font-bold mb-2">Campeões</h3>
@@ -125,7 +122,6 @@
             </div>
             <div class="overflow-x-auto">
                 <div id="participants-container">
-                    <!-- Participantes serão adicionados aqui -->
                 </div>
             </div>
         </div>
@@ -156,12 +152,11 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
         
-        const DEADLINE = new Date('2025-06-14T21:00:00Z');
-        
+        const ADMIN_IDS = ['fcXu5sNYZlR78hWTYD1LAwT7rvz1', 'jzNdqA4D58S4BPtAb4jD7tquLCQ2'];
+        const DEADLINE = new Date('2025-06-14T21:00:00Z'); // Prazo final: 14 de Junho de 2025, 18:00 (Brasília)
         let currentUser = null;
 
         const matches = [
-            // FASE DE GRUPOS
             { id: 'm1', group: 'A', home: 'Palmeiras', away: 'Porto' }, { id: 'm2', group: 'A', home: 'Inter Miami', away: 'Al Ahly' }, { id: 'm3', group: 'A', home: 'Palmeiras', away: 'Inter Miami' }, { id: 'm4', group: 'A', home: 'Al Ahly', away: 'Porto' }, { id: 'm5', group: 'A', home: 'Porto', away: 'Inter Miami' }, { id: 'm6', group: 'A', home: 'Al Ahly', away: 'Palmeiras' },
             { id: 'm7', group: 'B', home: 'PSG', away: 'Atlético de Madrid' }, { id: 'm8', group: 'B', home: 'Botafogo', away: 'Seattle Sounders' }, { id: 'm9', group: 'B', home: 'PSG', away: 'Botafogo' }, { id: 'm10', group: 'B', home: 'Seattle Sounders', away: 'Atlético de Madrid' }, { id: 'm11', group: 'B', home: 'Atlético de Madrid', away: 'Botafogo' }, { id: 'm12', group: 'B', home: 'Seattle Sounders', away: 'PSG' },
             { id: 'm13', group: 'C', home: 'Bayern de Munique', away: 'Auckland City' }, { id: 'm14', group: 'C', home: 'Boca Juniors', away: 'Benfica' }, { id: 'm15', group: 'C', home: 'Bayern de Munique', away: 'Boca Juniors' }, { id: 'm16', group: 'C', home: 'Benfica', away: 'Auckland City' }, { id: 'm17', group: 'C', home: 'Auckland City', away: 'Boca Juniors' }, { id: 'm18', group: 'C', home: 'Benfica', away: 'Bayern de Munique' },
@@ -170,7 +165,6 @@
             { id: 'm31', group: 'F', home: 'Fluminense', away: 'B. Dortmund' }, { id: 'm32', group: 'F', home: 'Ulsan HD', away: 'Mamelodi' }, { id: 'm33', group: 'F', home: 'Fluminense', away: 'Ulsan HD' }, { id: 'm34', group: 'F', home: 'Mamelodi', away: 'B. Dortmund' }, { id: 'm35', group: 'F', home: 'B. Dortmund', away: 'Ulsan HD' }, { id: 'm36', group: 'F', home: 'Mamelodi', away: 'Fluminense' },
             { id: 'm37', group: 'G', home: 'Man. City', away: 'Wydad' }, { id: 'm38', group: 'G', home: 'Juventus', away: 'Al Ain' }, { id: 'm39', group: 'G', home: 'Man. City', away: 'Juventus' }, { id: 'm40', group: 'G', home: 'Al Ain', away: 'Wydad' }, { id: 'm41', group: 'G', home: 'Wydad', away: 'Juventus' }, { id: 'm42', group: 'G', home: 'Al Ain', away: 'Man. City' },
             { id: 'm43', group: 'H', home: 'Real Madrid', away: 'Al Hilal' }, { id: 'm44', group: 'H', home: 'Pachuca', away: 'RB Salzburg' }, { id: 'm45', group: 'H', home: 'Real Madrid', away: 'Pachuca' }, { id: 'm46', group: 'H', home: 'RB Salzburg', away: 'Al Hilal' }, { id: 'm47', group: 'H', home: 'Al Hilal', away: 'Pachuca' }, { id: 'm48', group: 'H', home: 'RB Salzburg', away: 'Real Madrid' },
-            // MATA-MATA
             { id: 'm49', stage: 'Oitavas', home: '1º Grupo A', away: '2º Grupo B' }, { id: 'm50', stage: 'Oitavas', home: '1º Grupo C', away: '2º Grupo D' },
             { id: 'm51', stage: 'Oitavas', home: '1º Grupo E', away: '2º Grupo F' }, { id: 'm52', stage: 'Oitavas', home: '1º Grupo G', away: '2º Grupo H' },
             { id: 'm53', stage: 'Oitavas', home: '1º Grupo B', away: '2º Grupo A' }, { id: 'm54', stage: 'Oitavas', home: '1º Grupo D', away: '2º Grupo C' },
@@ -244,7 +238,7 @@
 
             document.querySelectorAll('#official-results-container input, #official-champion, #official-vice').forEach(el => {
                 el.addEventListener('change', () => {
-                    if (!currentUser) return; 
+                    if (!currentUser || !ADMIN_IDS.includes(currentUser.uid)) return; 
                     const officialData = { bets: {}, champions: {} };
                     matches.forEach(m => {
                         const homeInput = document.getElementById(`official-${m.id}-home`);
@@ -334,6 +328,10 @@
                 currentUser = user;
                 document.getElementById('user-id').textContent = user.uid;
                 
+                if (ADMIN_IDS.includes(user.uid)) {
+                    document.getElementById('admin-section').classList.remove('hidden');
+                }
+
                 document.getElementById('add-participant').addEventListener('click', () => {
                     if (new Date() > DEADLINE) {
                         showDeadlineToast();
@@ -389,7 +387,6 @@
                         
                         if (new Date() > DEADLINE) {
                             showDeadlineToast();
-                            // Reverte a alteração visualmente
                             onSnapshot(doc(db, "bolao", docId), (docSnap) => {
                                 if(docSnap.exists()){
                                     const data = docSnap.data();
@@ -397,7 +394,7 @@
                                     const matchId = target.dataset.matchId;
 
                                     if(field) target.value = data.champions[field] ?? '';
-                                    else if(matchId) target.value = data.bets[matchId]?.[target.dataset.team] ?? '';
+                                    else if(matchId && data.bets && data.bets[matchId]) target.value = data.bets[matchId][target.dataset.team] ?? '';
                                 }
                             });
                             return;
@@ -469,4 +466,3 @@
     </script>
 </body>
 </html>
-```</immersive>
