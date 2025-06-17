@@ -94,7 +94,7 @@
             </div>
         </div>
 
-        <div id="admin-section" class="card p-4 sm:p-6 rounded-lg hidden">
+        <div id="admin-section" class="card p-4 sm:p-6 rounded-lg">
             <h2 class="text-xl font-bold mb-4 text-white">Resultados Oficiais (Administrador)</h2>
             <div id="official-results-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 text-sm">
             </div>
@@ -236,7 +236,7 @@
                 </div>
             `).join('');
 
-            document.querySelectorAll('#official-results-container input, #official-champion, #official-vice').forEach(el => {
+            document.querySelectorAll('#admin-section input').forEach(el => {
                 el.addEventListener('change', () => {
                     if (!currentUser || !ADMIN_IDS.includes(currentUser.uid)) return; 
                     const officialData = { bets: {}, champions: {} };
@@ -328,9 +328,10 @@
                 currentUser = user;
                 document.getElementById('user-id').textContent = user.uid;
                 
-                if (ADMIN_IDS.includes(user.uid)) {
-                    document.getElementById('admin-section').classList.remove('hidden');
-                }
+                const isUserAdmin = ADMIN_IDS.includes(user.uid);
+                document.querySelectorAll('#admin-section input').forEach(input => {
+                    input.disabled = !isUserAdmin;
+                });
 
                 document.getElementById('add-participant').addEventListener('click', () => {
                     if (new Date() > DEADLINE) {
